@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EasyAsset Graph Platform",
-  description: "대체자산 AI 평가 플랫폼 - Graph Intelligence for Alternative Assets",
+  title: "EG Asset Pricing & Data Platform",
+  description: "대체자산 AI 데이터 플랫폼 - Graph Intelligence for Alternative Assets",
 };
 
 export default function RootLayout({

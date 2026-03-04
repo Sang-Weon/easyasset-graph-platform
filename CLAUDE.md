@@ -1,4 +1,4 @@
-# EasyAsset Graph Platform
+# EG Asset Pricing & Data Platform
 
 ## 프로젝트 개요
 대체자산(PF, Private Credit, PE) 평가를 위한 Graph Intelligence Platform.

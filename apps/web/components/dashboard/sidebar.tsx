@@ -57,12 +57,12 @@ export function Sidebar() {
       {/* 로고 */}
       <div className="flex h-16 items-center gap-2 border-b border-[var(--border)] px-6">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--primary)] text-sm text-[var(--primary-foreground)]">
-          EA
+          EG
         </div>
         <div>
-          <p className="text-sm font-semibold">EasyAsset</p>
+          <p className="text-sm font-semibold">EG Asset Pricing</p>
           <p className="text-[10px] text-[var(--muted-foreground)]">
-            Graph Platform
+            Data Platform
           </p>
         </div>
       </div>
@@ -97,9 +97,9 @@ export function Sidebar() {
       {/* 하단 정보 */}
       <div className="border-t border-[var(--border)] p-4">
         <div className="rounded-lg bg-[var(--muted)] p-3">
-          <p className="text-xs font-medium">이지자산평가</p>
+          <p className="text-xs font-medium">EG Asset Pricing</p>
           <p className="text-[10px] text-[var(--muted-foreground)]">
-            대체자산 AI 평가 플랫폼 v0.1
+            대체자산 AI 데이터 플랫폼 v0.1
           </p>
         </div>
       </div>

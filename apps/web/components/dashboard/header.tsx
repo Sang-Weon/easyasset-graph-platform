@@ -33,7 +33,7 @@ export function Header() {
           <div className="hidden sm:block">
             <p className="text-sm font-medium">관리자</p>
             <p className="text-[10px] text-[var(--muted-foreground)]">
-              admin@easyasset.com
+              admin@egasset.com
             </p>
           </div>
         </div>
