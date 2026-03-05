@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useChat } from "@ai-sdk/react";
+import type { UIMessage } from "ai";
+import { DefaultChatTransport } from "ai";
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -14,44 +17,41 @@ import { Badge } from "@/components/ui/badge";
 const SUGGESTED_QUERIES = [
   "태영건설이 부도나면 어떤 펀드가 영향받아?",
   "현재 Covenant 위반 상태인 대출은?",
-  "LTV 0.7 이상인 PF 프로젝트 리스트 보여줘",
+  "LTV 위반 가능성 높은 PF 프로젝트 알려줘",
+  "신규 Covenant 설정 시 ICR threshold 권고값은?",
   "KB부동산대출펀드의 포트폴리오 구성은?",
   "신용등급 BBB 이하 시공사의 책임준공 현황은?",
 ];
 
-const DEMO_MESSAGES = [
-  {
-    role: "user" as const,
-    content: "태영건설이 부도나면 어떤 펀드가 영향받아?",
-  },
-  {
-    role: "assistant" as const,
-    content: `태영건설(BB+, NEGATIVE) 부도 시나리오를 분석했습니다.
-
-**영향받는 PF 사업장 3건:**
-1. 강남 센터프라임 타워 — 총 ₩1,200억 (3개 트렌치)
-2. 판교 물류센터 — 총 ₩800억 (2개 트렌치)
-3. 인천 오피스텔 — 총 ₩400억 (1개 트렌치)
-
-**영향받는 펀드 5개:**
-| 펀드 | NAV | 추정 손실 | NAV 영향 |
-|------|-----|---------|----------|
-| KB부동산대출1호 | ₩5,000억 | ₩40억 | -0.8% |
-| 신한메자닌펀드 | ₩2,000억 | ₩180억 | -9.0% |
-| 하나에쿼티펀드 | ₩800억 | ₩95억 | -11.9% |
-| NH물류투자1호 | ₩3,000억 | ₩130억 | -4.3% |
-| KB메자닌2호 | ₩1,500억 | ₩130억 | -8.7% |
-
-**총 추정 손실: ₩575억** (회수율 가정: Senior 95%, Mezzanine 40%, Junior 5%)
-
-⚠️ 특히 하나에쿼티펀드(Junior 트렌치)와 신한메자닌펀드의 NAV 영향이 크므로 주의가 필요합니다.`,
-    tool: "query_graph → simulate_contagion",
-  },
-];
+const TOOL_LABELS: Record<string, string> = {
+  query_neo4j: "그래프 쿼리",
+  run_contagion_simulation: "연쇄부도 시뮬레이션",
+  check_covenants: "Covenant 조회",
+  recommend_graph_settings: "설정 추천",
+  generate_report: "리포트 생성",
+};
 
 export default function ChatPage() {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState(DEMO_MESSAGES);
+  const transport = useMemo(() => new DefaultChatTransport({ api: "/api/agent" }), []);
+  const { messages, sendMessage, status } = useChat({
+    transport,
+  });
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isLoading = status === "submitted" || status === "streaming";
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const onSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!input.trim() || isLoading) return;
+    sendMessage({ text: input });
+    setInput("");
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -82,70 +82,146 @@ export default function ChatPage() {
             <span>💬</span>
             대체자산 분석 에이전트
             <Badge variant="outline" className="text-[10px]">
-              Claude Sonnet 4
+              Claude Sonnet 4 · Neo4j Graph
             </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="flex h-[calc(100%-8rem)] flex-col p-0">
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.map((msg, i) => (
-              <div
-                key={i}
-                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-              >
+          {/* 메시지 영역 */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={scrollRef}>
+            {messages.length === 0 && (
+              <div className="flex h-full items-center justify-center">
+                <p className="text-sm text-[var(--muted-foreground)]">
+                  위 추천 질문을 클릭하거나 자유롭게 질문을 입력하세요
+                </p>
+              </div>
+            )}
+
+            {(messages as UIMessage[]).map((m) => {
+              const textParts =
+                m.parts?.filter((p: { type: string }) => p.type === "text") ??
+                [];
+              const toolParts =
+                m.parts?.filter(
+                  (p: { type: string }) => p.type === "tool-invocation"
+                ) ?? [];
+
+              return (
                 <div
-                  className={`max-w-[80%] rounded-xl px-4 py-3 ${
-                    msg.role === "user"
-                      ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
-                      : "bg-[var(--muted)]"
-                  }`}
+                  key={m.id}
+                  className={`flex gap-3 ${m.role === "user" ? "justify-end" : "justify-start"}`}
                 >
-                  {"tool" in msg && msg.tool && (
-                    <div className="mb-2 flex items-center gap-1">
-                      <Badge
-                        variant="secondary"
-                        className="bg-blue-100 text-blue-800 text-[10px] dark:bg-blue-900 dark:text-blue-300"
-                      >
-                        🔧 {msg.tool}
-                      </Badge>
+                  {/* 아바타 */}
+                  {m.role !== "user" && (
+                    <div className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--muted)] text-xs font-medium">
+                      AI
                     </div>
                   )}
-                  <div className="whitespace-pre-wrap text-sm">
-                    {msg.content}
+
+                  <div
+                    className={`max-w-[80%] rounded-xl px-4 py-3 ${
+                      m.role === "user"
+                        ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
+                        : "bg-[var(--muted)]"
+                    }`}
+                  >
+                    {/* 도구 호출 표시 */}
+                    {toolParts.map(
+                      (part: Record<string, unknown>, i: number) => {
+                        const toolName = String(
+                          (
+                            part as {
+                              toolInvocation?: { toolName?: string };
+                            }
+                          )?.toolInvocation?.toolName ?? "도구"
+                        );
+                        return (
+                          <div
+                            key={i}
+                            className="mb-2 rounded border border-[var(--border)] bg-[var(--background)] p-2 text-xs font-mono"
+                          >
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] mb-1"
+                            >
+                              {TOOL_LABELS[toolName] ?? toolName}
+                            </Badge>
+                          </div>
+                        );
+                      }
+                    )}
+
+                    {/* 텍스트 파트 */}
+                    {textParts.map(
+                      (p: { type: string; text?: string }, i: number) => (
+                        <div key={i} className="whitespace-pre-wrap text-sm">
+                          {(p as { text: string }).text}
+                        </div>
+                      )
+                    )}
                   </div>
+
+                  {/* 유저 아바타 */}
+                  {m.role === "user" && (
+                    <div className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-medium">
+                      나
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* 로딩 인디케이터 */}
+            {isLoading && (
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--muted)] text-xs font-medium">
+                  AI
+                </div>
+                <div className="flex items-center gap-1.5 rounded-xl bg-[var(--muted)] px-4 py-3">
+                  {[0, 200, 400].map((delay) => (
+                    <span
+                      key={delay}
+                      className="h-2 w-2 rounded-full bg-[var(--muted-foreground)] animate-bounce"
+                      style={{ animationDelay: `${delay}ms` }}
+                    />
+                  ))}
                 </div>
               </div>
-            ))}
+            )}
           </div>
 
-          {/* 입력 */}
-          <div className="border-t border-[var(--border)] p-4">
+          {/* 입력 영역 */}
+          <form
+            onSubmit={onSubmit}
+            className="border-t border-[var(--border)] p-4"
+          >
             <div className="flex gap-2">
               <Textarea
                 placeholder="질문을 입력하세요... (예: 태영건설 관련 PF 현황)"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                className="min-h-[2.5rem] max-h-32 resize-none"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    onSubmit();
+                  }
+                }}
+                className="min-h-[2.5rem] max-h-32 resize-none text-sm"
                 rows={1}
+                disabled={isLoading}
               />
               <Button
-                onClick={() => {
-                  if (!input.trim()) return;
-                  setMessages((prev) => [
-                    ...prev,
-                    { role: "user", content: input },
-                  ]);
-                  setInput("");
-                }}
+                type="submit"
+                disabled={isLoading || !input.trim()}
               >
-                전송
+                {isLoading ? "분석 중..." : "전송"}
               </Button>
             </div>
             <p className="mt-2 text-[10px] text-[var(--muted-foreground)]">
-              Claude API + Neo4j Cypher 자동 생성 · Tool Use: query_graph,
-              check_covenants, simulate_contagion, generate_report
+              Claude Sonnet 4 + Neo4j Cypher · 도구: 그래프 쿼리, 연쇄부도
+              시뮬레이션, Covenant 조회, 설정 추천, 리포트 생성
             </p>
-          </div>
+          </form>
         </CardContent>
       </Card>
     </div>
